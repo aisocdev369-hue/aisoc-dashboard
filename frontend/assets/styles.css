@@ -25,6 +25,8 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 html, body { min-height: 100%; }
 
 body {
@@ -261,6 +263,43 @@ tbody tr:focus-visible { outline-offset: -2px; }
 
 /* ---------- Footer ---------- */
 .footer { max-width: 1280px; margin: 0 auto; padding: 0 var(--gutter) 32px; color: var(--muted); font-size: 0.8rem; }
+
+/* ---------- Sign-in ---------- */
+.login-screen {
+  min-height: 100vh; display: grid; place-items: center; padding: 24px;
+}
+.login-card { width: min(420px, 100%); gap: 16px; padding: 28px; }
+.login-form { display: grid; gap: 14px; }
+.login-form label { display: grid; gap: 6px; font-size: 0.85rem; color: var(--muted); }
+.login-form input {
+  font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 42px;
+}
+.form-error { margin: 0; color: #fca5a5; font-size: 0.9rem; }
+.user { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--muted); flex-wrap: wrap; }
+.role-pill {
+  padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line);
+  color: #7dd3fc; font-size: 0.75rem;
+}
+
+/* ---------- Buttons ---------- */
+.btn { font: inherit; font-weight: 600; border-radius: 10px; padding: 9px 14px; min-height: 40px; cursor: pointer; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #001018; border: 0; }
+.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+.btn-ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.05); }
+
+/* ---------- Pager and AI panel ---------- */
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.ai-box { border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 10px; }
+.ai-title { margin: 0; font-weight: 600; }
+.ai-note { margin: 0; color: var(--muted); font-size: 0.8rem; }
+.ai-meta { margin: 0; color: var(--muted); font-size: 0.8rem; }
+#ai-result h3 { margin: 10px 0 2px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+#ai-result p { margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.78rem; padding: 2px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.12); color: #7dd3fc; }
+.recs { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
 
 /* ---------- Small screens ---------- */
 @media (max-width: 640px) {

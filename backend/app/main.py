@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import get_settings
-from app.core.database import get_engine
+from app.db.session import get_engine
+from app.routers import admin, ai, alerts, auth
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
@@ -13,7 +14,7 @@ logger = logging.getLogger("soc")
 
 app = FastAPI(
     title="SOC Dashboard API",
-    version="0.1.0",
+    version="0.2.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
 )
@@ -22,9 +23,14 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_methods=["GET", "POST"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+app.include_router(auth.router)
+app.include_router(alerts.router)
+app.include_router(ai.router)
+app.include_router(admin.router)
 
 
 @app.get("/health", tags=["health"])
@@ -38,7 +44,6 @@ def health(response: Response):
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
     except Exception:
-        # Details stay in server logs; clients get no connection information.
         logger.exception("database health check failed")
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {"status": "degraded", "database": "unavailable"}

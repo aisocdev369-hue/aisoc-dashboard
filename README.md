@@ -15,6 +15,21 @@ AI-assisted Security Operations Center dashboard. Stage 2: Codespaces environmen
 
 4. Open the forwarded port 8080. Check `http://localhost:8080/health` returns `{"status":"ok", ...}`.
 
+## First-time setup (after the stack is healthy)
+
+Migrations run automatically when the API starts. Then create the first administrator. The password is typed at a prompt and never passed as an argument:
+
+```bash
+docker compose exec api python -m app.cli create-user --email you@example.com --role admin
+docker compose exec api python -m app.cli seed-simulated --count 48
+```
+
+Analysts are created by an administrator from the admin API (`POST /api/v1/admin/users`).
+
+## Gemini AI analysis
+
+Set `GEMINI_API_KEY` in Codespaces Secrets or `.env`. Without it, the analysis button returns "not configured" and nothing is sent to Google. Analysis sends only the alert fields listed in `backend/app/routers/ai.py`. Outputs are validated and stored, and never executed.
+
 ## Run tests
 
 ```bash
