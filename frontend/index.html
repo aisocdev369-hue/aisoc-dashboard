@@ -3,13 +3,127 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SOC Dashboard</title>
+  <title>AISOC · Security Operations Dashboard</title>
+  <meta name="description" content="AI-assisted SOC dashboard. Development preview using simulated data.">
+  <link rel="stylesheet" href="assets/styles.css">
 </head>
 <body>
-  <main>
-    <h1>SOC Dashboard</h1>
-    <p>Stage 2 placeholder. The dashboard UI arrives in Stage 3.</p>
-    <p>API health: <a href="/health">/health</a></p>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">&#9672;</span>
+      <div>
+        <strong>AISOC</strong>
+        <small>Security Operations Center</small>
+      </div>
+    </div>
+    <nav aria-label="Primary">
+      <a href="#overview" class="is-active">Overview</a>
+      <a href="#alerts">Alerts</a>
+      <a href="#incident">Incident</a>
+    </nav>
+    <div class="status" role="status"><span class="dot" aria-hidden="true"></span>System online</div>
+  </header>
+
+  <div class="sim-banner" role="note">
+    <strong>SIMULATED DATA.</strong> Development preview. None of the alerts, hosts or incidents shown here are real security events.
+  </div>
+
+  <main id="main">
+    <section id="overview" aria-labelledby="overview-title">
+      <div class="section-head">
+        <h1 id="overview-title">Security overview</h1>
+        <p class="muted">Last 24 hours</p>
+      </div>
+
+      <div class="kpis" id="kpis"></div>
+
+      <div class="grid-2">
+        <article class="card">
+          <h2>Alert trend</h2>
+          <div id="trend"></div>
+        </article>
+        <article class="card">
+          <h2>Severity distribution</h2>
+          <div id="severity"></div>
+        </article>
+      </div>
+
+      <div class="grid-2">
+        <article class="card">
+          <h2>Top targeted hosts</h2>
+          <div id="hosts"></div>
+        </article>
+        <article class="card" id="incident">
+          <h2>Incident timeline <span class="tag tag-sim">Simulated</span></h2>
+          <div id="timeline"></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="alerts" aria-labelledby="alerts-title">
+      <div class="section-head">
+        <h2 id="alerts-title">Alerts</h2>
+        <p class="muted" id="count" aria-live="polite"></p>
+      </div>
+
+      <form class="toolbar" role="search" onsubmit="return false">
+        <label class="search">
+          <span class="sr-only">Search alerts</span>
+          <input id="q" type="search" placeholder="Search rule, host, source IP, MITRE ID" autocomplete="off">
+        </label>
+        <label>
+          <span class="sr-only">Filter by severity</span>
+          <select id="sev">
+            <option value="all">All severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+        </label>
+        <label>
+          <span class="sr-only">Filter by status</span>
+          <select id="status">
+            <option value="all">All statuses</option>
+            <option value="New">New</option>
+            <option value="Investigating">Investigating</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </label>
+      </form>
+
+      <div class="alerts-layout">
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">Security alerts (simulated)</caption>
+            <thead>
+              <tr>
+                <th scope="col">Time</th>
+                <th scope="col">Severity</th>
+                <th scope="col">Rule</th>
+                <th scope="col">Host</th>
+                <th scope="col">Source IP</th>
+                <th scope="col">MITRE</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <p class="empty" id="empty" hidden>No alerts match these filters.</p>
+        </div>
+
+        <aside class="card detail" id="detail" aria-live="polite" aria-label="Selected alert"></aside>
+      </div>
+    </section>
   </main>
+
+  <footer class="footer">
+    <p>AISOC development preview · Data is simulated until the monitoring adapters are connected (Stage 6).</p>
+  </footer>
+
+  <script src="assets/mock-data.js"></script>
+  <script src="assets/app.js"></script>
 </body>
 </html>
