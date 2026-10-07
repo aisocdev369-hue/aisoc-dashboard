@@ -41,6 +41,35 @@
   </section>
 
   <div id="app" hidden>
+    <div id="password-modal" class="modal" hidden>
+      <div class="modal-card card">
+        <div class="modal-head">
+          <h2>Change password</h2>
+          <button id="close-password-modal" class="btn btn-ghost" type="button" aria-label="Close change password dialog">Close</button>
+        </div>
+        <form id="password-form" class="password-form" novalidate>
+          <label>
+            <span>Current password</span>
+            <input id="current-password" type="password" autocomplete="current-password" required maxlength="72">
+          </label>
+          <label>
+            <span>New password</span>
+            <input id="new-password" type="password" autocomplete="new-password" required minlength="12" maxlength="72">
+          </label>
+          <label>
+            <span>Confirm new password</span>
+            <input id="confirm-password" type="password" autocomplete="new-password" required minlength="12" maxlength="72">
+          </label>
+          <p id="password-error" class="form-error" role="alert" hidden></p>
+          <p id="password-success" class="form-success" role="status" hidden></p>
+          <div class="modal-actions">
+            <button id="cancel-password" class="btn btn-ghost" type="button">Cancel</button>
+            <button class="btn btn-primary" type="submit">Update password</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <header class="topbar">
       <div class="brand">
         <span class="logo" aria-hidden="true">&#9672;</span>
@@ -58,6 +87,7 @@
         <span class="dot" aria-hidden="true"></span>
         <span id="user-email"></span>
         <span class="role-pill" id="user-role"></span>
+        <button id="change-password" class="btn btn-ghost" type="button">Change password</button>
         <button id="signout" class="btn btn-ghost" type="button">Sign out</button>
       </div>
     </header>

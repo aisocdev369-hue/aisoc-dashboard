@@ -55,6 +55,16 @@ def test_search_treats_wildcards_literally(make_user, auth_header, client, seed_
     assert resp.json()["total"] == 0
 
 
+def test_blank_searches_are_ignored(make_user, auth_header, client, seed_alerts):
+    make_user("analyst@example.com", "analyst")
+    headers = auth_header("analyst@example.com")
+    resp = client.get("/api/v1/alerts?q=   ", headers=headers)
+    assert resp.json()["total"] == 3
+
+    spaced = client.get("/api/v1/alerts?q= 203.0.113 ", headers=headers)
+    assert spaced.json()["total"] == 2
+
+
 def test_invalid_filter_is_rejected(make_user, auth_header, client):
     make_user("analyst@example.com", "analyst")
     resp = client.get("/api/v1/alerts?severity=extreme", headers=auth_header("analyst@example.com"))

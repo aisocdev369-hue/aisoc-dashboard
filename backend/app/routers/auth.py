@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.security import create_access_token, timing_dummy_hash, verify_password
+from app.core.security import create_access_token, hash_password, timing_dummy_hash, verify_password
 from app.db.models import User
 from app.db.session import get_db
 from app.deps import get_current_user
-from app.schemas import LoginRequest, TokenOut, UserOut
+from app.schemas import ChangePasswordRequest, LoginRequest, TokenOut, UserOut
 from app.services import audit
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -39,6 +39,25 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -
     token, ttl = create_access_token(user.id, user.role)
     audit.record(db, "login", actor_id=user.id, ip=ip)
     return TokenOut(access_token=token, expires_in=ttl, role=user.role)
+
+
+@router.post("/change-password")
+def change_password(
+    body: ChangePasswordRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if not verify_password(body.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=400, detail="New password must differ from the current password")
+
+    user.hashed_password = hash_password(body.new_password)
+    db.add(user)
+    db.commit()
+    audit.record(db, "password_changed", actor_id=user.id, ip=_client_ip(request))
+    return {"status": "ok"}
 
 
 @router.get("/me", response_model=UserOut)

@@ -26,6 +26,34 @@ def test_wrong_password_is_rejected_and_audited(make_user, login, session_factor
     assert "login_failed" in actions
 
 
+def test_current_user_can_change_password(make_user, auth_header, client):
+    make_user("analyst@example.com", "analyst")
+    headers = auth_header("analyst@example.com")
+    new_password = "NewStrongPassword123!"
+
+    resp = client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "correct-horse-battery-staple", "new_password": new_password},
+        headers=headers,
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+    assert client.post("/api/v1/auth/login", json={"email": "analyst@example.com", "password": new_password}).status_code == 200
+    assert client.post("/api/v1/auth/login", json={"email": "analyst@example.com", "password": "correct-horse-battery-staple"}).status_code == 401
+
+
+def test_change_password_rejects_wrong_current_password(make_user, auth_header, client):
+    make_user("analyst@example.com", "analyst")
+    resp = client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "wrong-password", "new_password": "NewStrongPassword123!"},
+        headers=auth_header("analyst@example.com"),
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "Current password is incorrect"
+
+
 def test_unknown_email_gets_same_message(login):
     resp = login("nobody@example.com")
     assert resp.status_code == 401

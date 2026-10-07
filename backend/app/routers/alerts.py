@@ -61,8 +61,10 @@ def list_alerts(
         stmt = stmt.where(Alert.severity == severity)
     if alert_status:
         stmt = stmt.where(Alert.status == alert_status)
+    if q is not None:
+        q = q.strip()
     if q:
-        pattern = f"%{_escape_like(q.strip())}%"
+        pattern = f"%{_escape_like(q)}%"
         stmt = stmt.where(
             or_(
                 Alert.rule.ilike(pattern, escape="\\"),

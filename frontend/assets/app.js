@@ -433,7 +433,7 @@
   var debounceTimer = null;
   function bindFilters() {
     $("q").addEventListener("input", function (e) {
-      table.q = e.target.value;
+      table.q = String(e.target.value || "").trim();
       table.page = 1;
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(loadTable, 250);
@@ -443,6 +443,10 @@
     $("prev").addEventListener("click", function () { table.page--; loadTable(); });
     $("next").addEventListener("click", function () { table.page++; loadTable(); });
     $("signout").addEventListener("click", function () { signOut(""); });
+    $("change-password").addEventListener("click", openPasswordModal);
+    $("close-password-modal").addEventListener("click", closePasswordModal);
+    $("cancel-password").addEventListener("click", closePasswordModal);
+    $("password-form").addEventListener("submit", onChangePassword);
     $("login-form").addEventListener("submit", onLogin);
     $("toggle-password").addEventListener("click", togglePasswordVisibility);
   }
@@ -456,6 +460,71 @@
     $("toggle-password-label").textContent = shown ? "Show password" : "Hide password";
     $("toggle-password-icon").textContent = shown ? "\u{1F441}" : "\u{1F576}";
     input.focus();
+  }
+
+  function setPasswordFeedback(type, message) {
+    var error = $("password-error");
+    var success = $("password-success");
+    error.hidden = type !== "error";
+    success.hidden = type !== "success";
+    error.textContent = type === "error" ? message : "";
+    success.textContent = type === "success" ? message : "";
+  }
+
+  function resetPasswordForm() {
+    $("password-form").reset();
+    setPasswordFeedback("", "");
+  }
+
+  function openPasswordModal() {
+    $("password-modal").hidden = false;
+    resetPasswordForm();
+    $("current-password").focus();
+  }
+
+  function closePasswordModal() {
+    $("password-modal").hidden = true;
+    resetPasswordForm();
+  }
+
+  function onChangePassword(event) {
+    event.preventDefault();
+    var form = $("password-form");
+    var currentPassword = $("current-password").value;
+    var newPassword = $("new-password").value;
+    var confirmPassword = $("confirm-password").value;
+    var submit = form.querySelector('button[type="submit"]');
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordFeedback("error", "Please complete all password fields.");
+      return;
+    }
+    if (newPassword.length < 12 || newPassword.length > 72) {
+      setPasswordFeedback("error", "New password must be 12 to 72 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordFeedback("error", "New passwords do not match.");
+      return;
+    }
+
+    submit.disabled = true;
+    setPasswordFeedback("", "");
+    api("/auth/change-password", {
+      method: "POST",
+      body: {
+        current_password: currentPassword,
+        new_password: newPassword
+      }
+    }).then(function () {
+      setPasswordFeedback("success", "Password updated successfully.");
+      form.reset();
+      setTimeout(function () { closePasswordModal(); }, 1000);
+    }).catch(function (err) {
+      setPasswordFeedback("error", err.message || "Could not update the password.");
+    }).then(function () {
+      submit.disabled = false;
+    });
   }
 
   function loadAll() {
