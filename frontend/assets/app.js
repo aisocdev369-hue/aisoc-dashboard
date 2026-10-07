@@ -444,6 +444,18 @@
     $("next").addEventListener("click", function () { table.page++; loadTable(); });
     $("signout").addEventListener("click", function () { signOut(""); });
     $("login-form").addEventListener("submit", onLogin);
+    $("toggle-password").addEventListener("click", togglePasswordVisibility);
+  }
+
+  function togglePasswordVisibility() {
+    var input = $("login-password");
+    var btn = $("toggle-password");
+    var shown = input.type === "text";
+    input.type = shown ? "password" : "text";
+    btn.setAttribute("aria-pressed", String(!shown));
+    $("toggle-password-label").textContent = shown ? "Show password" : "Hide password";
+    $("toggle-password-icon").textContent = shown ? "\u{1F441}" : "\u{1F576}";
+    input.focus();
   }
 
   function loadAll() {

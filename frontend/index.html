@@ -26,7 +26,13 @@
         </label>
         <label>
           <span>Password</span>
-          <input id="login-password" type="password" autocomplete="current-password" required maxlength="72">
+          <div class="password-field">
+            <input id="login-password" type="password" autocomplete="current-password" required maxlength="72">
+            <button type="button" id="toggle-password" class="toggle-password" aria-pressed="false">
+              <span class="sr-only" id="toggle-password-label">Show password</span>
+              <span aria-hidden="true" id="toggle-password-icon">&#128065;</span>
+            </button>
+          </div>
         </label>
         <p id="login-error" class="form-error" role="alert" hidden></p>
         <button id="login-submit" class="btn btn-primary" type="submit">Sign in</button>
