@@ -26,6 +26,12 @@ docker compose exec api python -m app.cli seed-simulated --count 48
 
 Analysts are created by an administrator from the admin API (`POST /api/v1/admin/users`).
 
+To reset a password (e.g. if you forgot the one you set), run:
+
+```bash
+docker compose exec api python -m app.cli set-password --email you@example.com
+```
+
 ## Gemini AI analysis
 
 Set `GEMINI_API_KEY` in Codespaces Secrets or `.env`. Without it, the analysis button returns "not configured" and nothing is sent to Google. Analysis sends only the alert fields listed in `backend/app/routers/ai.py`. Outputs are validated and stored, and never executed.
