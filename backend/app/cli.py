@@ -1,6 +1,7 @@
 """Operator commands. Run inside the API container, for example:
 
     docker compose exec api python -m app.cli create-user --email you@example.com --role admin
+    docker compose exec api python -m app.cli set-password --email you@example.com
     docker compose exec api python -m app.cli seed-simulated --count 48
 
 Passwords are read interactively and never accepted as command-line arguments.

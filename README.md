@@ -41,6 +41,12 @@ docker compose exec api python -m app.cli set-role --email you@example.com --rol
 
 The password reset prompts interactively and does not put the password in shell history. The CLI will not demote the last active Admin.
 
+To reset a password (e.g. if you forgot the one you set), run:
+
+```bash
+docker compose exec api python -m app.cli set-password --email you@example.com
+```
+
 ## Gemini AI analysis
 
 Set `GEMINI_API_KEY` in Codespaces Secrets or `.env`. Without it, the analysis button returns "not configured" and nothing is sent to Google. Analysis sends only the alert fields listed in `backend/app/routers/ai.py`. Outputs are validated and stored, and never executed.
