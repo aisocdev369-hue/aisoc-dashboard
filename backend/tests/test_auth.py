@@ -1,4 +1,5 @@
 from app.db.models import AuditLog, User
+from app.routers import auth
 
 
 def test_login_returns_token_and_role(make_user, login):
@@ -14,6 +15,76 @@ def test_login_returns_token_and_role(make_user, login):
 def test_login_email_is_case_insensitive(make_user, login):
     make_user("admin@example.com", "admin")
     assert login("ADMIN@Example.com").status_code == 200
+
+
+def test_google_sign_in_registers_analyst_and_then_logs_in(client, session_factory, settings, monkeypatch):
+    settings.google_client_id = "test-google-client-id"
+    monkeypatch.setattr(
+        auth.id_token,
+        "verify_oauth2_token",
+        lambda credential, request, audience: {
+            "email": "new.analyst@gmail.com",
+            "email_verified": True,
+        },
+    )
+
+    registered = client.post("/api/v1/auth/google", json={"credential": "valid-google-id-token"})
+    assert registered.status_code == 200
+    assert registered.json()["role"] == "analyst"
+    assert client.get(
+        "/api/v1/admin/users",
+        headers={"Authorization": f"Bearer {registered.json()['access_token']}"},
+    ).status_code == 200
+    with session_factory() as db:
+        user = db.query(User).filter_by(email="new.analyst@gmail.com").one()
+        assert user.role == "analyst"
+        assert [row.action for row in db.query(AuditLog).all()] == ["google_register"]
+
+    signed_in = client.post("/api/v1/auth/google", json={"credential": "valid-google-id-token"})
+    assert signed_in.status_code == 200
+    assert signed_in.json()["role"] == "analyst"
+    with session_factory() as db:
+        assert [row.action for row in db.query(AuditLog).all()] == ["google_register", "google_login"]
+
+
+def test_google_sign_in_preserves_existing_admin_role(make_user, client, settings, monkeypatch):
+    make_user("admin@gmail.com", "admin")
+    settings.google_client_id = "test-google-client-id"
+    monkeypatch.setattr(
+        auth.id_token,
+        "verify_oauth2_token",
+        lambda credential, request, audience: {
+            "email": "admin@gmail.com",
+            "email_verified": True,
+        },
+    )
+
+    response = client.post("/api/v1/auth/google", json={"credential": "valid-google-id-token"})
+    assert response.status_code == 200
+    assert response.json()["role"] == "admin"
+
+
+def test_google_sign_in_rejects_unverified_email(client, settings, monkeypatch):
+    settings.google_client_id = "test-google-client-id"
+    monkeypatch.setattr(
+        auth.id_token,
+        "verify_oauth2_token",
+        lambda credential, request, audience: {
+            "email": "unverified@gmail.com",
+            "email_verified": False,
+        },
+    )
+
+    response = client.post("/api/v1/auth/google", json={"credential": "valid-google-id-token"})
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Google account email is not verified"
+
+
+def test_google_sign_in_requires_configuration(client, settings):
+    settings.google_client_id = ""
+    assert client.get("/api/v1/auth/google/config").json() == {"enabled": False, "client_id": None}
+    response = client.post("/api/v1/auth/google", json={"credential": "any-token"})
+    assert response.status_code == 503
 
 
 def test_wrong_password_is_rejected_and_audited(make_user, login, session_factory):
@@ -75,10 +146,65 @@ def test_garbage_token_is_rejected(client):
     assert resp.status_code == 401
 
 
-def test_analyst_is_forbidden_from_admin_routes(make_user, auth_header, client):
+def test_analyst_can_view_users_but_not_create_users_or_view_audit_logs(make_user, auth_header, client):
     make_user("analyst@example.com", "analyst")
-    resp = client.get("/api/v1/admin/users", headers=auth_header("analyst@example.com"))
-    assert resp.status_code == 403
+    headers = auth_header("analyst@example.com")
+    assert client.get("/api/v1/admin/users", headers=headers).status_code == 200
+    assert client.post(
+        "/api/v1/admin/users",
+        json={"email": "new@example.com", "password": "a-long-enough-password", "role": "analyst"},
+        headers=headers,
+    ).status_code == 403
+    assert client.get("/api/v1/admin/audit-logs", headers=headers).status_code == 403
+
+
+def test_analyst_can_assign_analyst_but_cannot_grant_admin(make_user, auth_header, client):
+    make_user("admin@example.com", "admin")
+    second_admin = make_user("second-admin@example.com", "admin")
+    analyst = make_user("analyst@example.com", "analyst")
+    headers = auth_header("analyst@example.com")
+
+    promoted = client.patch(
+        f"/api/v1/admin/users/{analyst.id}/role",
+        json={"role": "admin"},
+        headers=headers,
+    )
+    assert promoted.status_code == 403
+
+    demoted = client.patch(
+        f"/api/v1/admin/users/{second_admin.id}/role",
+        json={"role": "analyst"},
+        headers=headers,
+    )
+    assert demoted.status_code == 200
+    assert demoted.json()["role"] == "analyst"
+
+
+def test_admin_can_promote_analyst_to_admin(make_user, auth_header, client):
+    make_user("admin@example.com", "admin")
+    analyst = make_user("analyst@example.com", "analyst")
+    analyst_headers = auth_header("analyst@example.com")
+
+    promoted = client.patch(
+        f"/api/v1/admin/users/{analyst.id}/role",
+        json={"role": "admin"},
+        headers=auth_header("admin@example.com"),
+    )
+
+    assert promoted.status_code == 200
+    assert promoted.json()["role"] == "admin"
+    assert client.get("/api/v1/admin/users", headers=analyst_headers).status_code == 200
+
+
+def test_admin_cannot_demote_last_active_admin(make_user, auth_header, client):
+    admin = make_user("admin@example.com", "admin")
+    response = client.patch(
+        f"/api/v1/admin/users/{admin.id}/role",
+        json={"role": "analyst"},
+        headers=auth_header("admin@example.com"),
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Cannot demote the last active admin"
 
 
 def test_admin_can_create_user_and_duplicates_conflict(make_user, auth_header, client):

@@ -9,6 +9,15 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=72)
 
 
+class GoogleCredentialRequest(BaseModel):
+    credential: str = Field(min_length=1, max_length=8192)
+
+
+class GoogleAuthConfig(BaseModel):
+    enabled: bool
+    client_id: str | None = None
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -28,6 +37,10 @@ class UserOut(BaseModel):
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=12, max_length=72)
+    role: Literal["admin", "analyst"]
+
+
+class UserRoleUpdate(BaseModel):
     role: Literal["admin", "analyst"]
 
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AISOC · Security Operations Dashboard</title>
   <meta name="description" content="AI-assisted SOC dashboard. Development preview using simulated data.">
-  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="assets/styles.css?v=3">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -13,12 +13,20 @@
   <!-- Sign-in -->
   <section id="login" class="login-screen" aria-labelledby="login-title" hidden>
     <div class="login-card card">
-      <div class="brand">
-        <span class="logo" aria-hidden="true">&#9672;</span>
-        <div><strong>AISOC</strong><small>Security Operations Center</small></div>
+      <div class="login-head">
+        <div class="brand">
+          <span class="logo" aria-hidden="true">&#9672;</span>
+          <div><strong>AISOC</strong><small>Security Operations Center</small></div>
+        </div>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light theme" title="Switch to light theme">
+          <span class="theme-icon" aria-hidden="true">☼</span>
+        </button>
       </div>
       <h1 id="login-title">Sign in</h1>
-      <p class="muted">Analysts and administrators only. Accounts are created by an administrator.</p>
+      <p class="muted">Sign in or register with a verified Google account. New accounts are assigned the Analyst role.</p>
+      <div id="google-signin" class="google-signin" hidden></div>
+      <p id="google-signin-status" class="muted" role="status" hidden></p>
+      <div class="login-divider"><span>or sign in with email and password</span></div>
       <form id="login-form" class="login-form" novalidate>
         <label>
           <span>Email</span>
@@ -50,15 +58,30 @@
         <form id="password-form" class="password-form" novalidate>
           <label>
             <span>Current password</span>
-            <input id="current-password" type="password" autocomplete="current-password" required maxlength="72">
+            <div class="password-field">
+              <input id="current-password" type="password" autocomplete="current-password" required maxlength="72">
+              <button type="button" id="toggle-current-password" class="toggle-password" aria-label="Show current password" aria-pressed="false">
+                <span aria-hidden="true" id="toggle-current-password-icon">&#128065;</span>
+              </button>
+            </div>
           </label>
           <label>
             <span>New password</span>
-            <input id="new-password" type="password" autocomplete="new-password" required minlength="12" maxlength="72">
+            <div class="password-field">
+              <input id="new-password" type="password" autocomplete="new-password" required minlength="12" maxlength="72">
+              <button type="button" id="toggle-new-password" class="toggle-password" aria-label="Show new password" aria-pressed="false">
+                <span aria-hidden="true" id="toggle-new-password-icon">&#128065;</span>
+              </button>
+            </div>
           </label>
           <label>
             <span>Confirm new password</span>
-            <input id="confirm-password" type="password" autocomplete="new-password" required minlength="12" maxlength="72">
+            <div class="password-field">
+              <input id="confirm-password" type="password" autocomplete="new-password" required minlength="12" maxlength="72">
+              <button type="button" id="toggle-confirm-password" class="toggle-password" aria-label="Show confirm password" aria-pressed="false">
+                <span aria-hidden="true" id="toggle-confirm-password-icon">&#128065;</span>
+              </button>
+            </div>
           </label>
           <p id="password-error" class="form-error" role="alert" hidden></p>
           <p id="password-success" class="form-success" role="status" hidden></p>
@@ -82,11 +105,15 @@
         <a href="#overview" class="is-active">Overview</a>
         <a href="#alerts">Alerts</a>
         <a href="#incident">Incident</a>
+        <a id="users-nav" href="#users" hidden>Users</a>
       </nav>
       <div class="user">
         <span class="dot" aria-hidden="true"></span>
         <span id="user-email"></span>
         <span class="role-pill" id="user-role"></span>
+        <button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light theme" title="Switch to light theme">
+          <span class="theme-icon" aria-hidden="true">☼</span>
+        </button>
         <button id="change-password" class="btn btn-ghost" type="button">Change password</button>
         <button id="signout" class="btn btn-ghost" type="button">Sign out</button>
       </div>
@@ -127,6 +154,29 @@
             <h2>Incident timeline <span class="tag tag-sim">Simulated</span></h2>
             <div id="timeline"></div>
           </article>
+        </div>
+      </section>
+
+      <section id="users" aria-labelledby="users-title" hidden>
+        <div class="section-head">
+          <h2 id="users-title">User accounts</h2>
+          <p class="muted" id="users-count" aria-live="polite"></p>
+        </div>
+        <p id="users-error" class="form-error" role="alert" hidden></p>
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">Dashboard user accounts and roles</caption>
+            <thead>
+              <tr>
+                <th scope="col">Email</th>
+                <th scope="col">Role</th>
+                <th scope="col">Status</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="user-rows"></tbody>
+          </table>
+          <p class="empty" id="users-empty" hidden>No user accounts found.</p>
         </div>
       </section>
 
@@ -200,6 +250,6 @@
   </div>
 
   <script src="assets/mock-data.js"></script>
-  <script src="assets/app.js"></script>
+  <script src="assets/app.js?v=3"></script>
 </body>
 </html>

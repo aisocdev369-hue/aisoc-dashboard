@@ -10,11 +10,12 @@ import argparse
 import getpass
 import sys
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.security import hash_password
 from app.db.models import ROLES, User
 from app.db.session import get_session_factory
+from app.services import audit
 from app.services.simulated import seed_simulated_alerts
 
 
@@ -45,6 +46,64 @@ def _create_user(email: str, role: str) -> int:
     return 0
 
 
+def _set_password(email: str) -> int:
+    password = getpass.getpass("New password (min 12 characters): ")
+    if len(password) < 12 or len(password) > 72:
+        print("Password must be 12 to 72 characters.", file=sys.stderr)
+        return 2
+    if getpass.getpass("Repeat new password: ") != password:
+        print("Passwords do not match.", file=sys.stderr)
+        return 2
+
+    factory = get_session_factory()
+    if factory is None:
+        print("DATABASE_URL is not configured.", file=sys.stderr)
+        return 2
+    normalised = email.strip().lower()
+    with factory() as db:
+        user = db.scalar(select(User).where(User.email == normalised))
+        if user is None:
+            print("No user with this email exists.", file=sys.stderr)
+            return 1
+        user.hashed_password = hash_password(password)
+        db.commit()
+        audit.record(db, "password_reset", target=normalised)
+    print(f"Password updated for {normalised}")
+    return 0
+
+
+def _set_role(email: str, role: str) -> int:
+    if role not in ROLES:
+        print(f"role must be one of {ROLES}", file=sys.stderr)
+        return 2
+
+    factory = get_session_factory()
+    if factory is None:
+        print("DATABASE_URL is not configured.", file=sys.stderr)
+        return 2
+    normalised = email.strip().lower()
+    with factory() as db:
+        user = db.scalar(select(User).where(User.email == normalised))
+        if user is None:
+            print("No user with this email exists.", file=sys.stderr)
+            return 1
+        if user.role == "admin" and user.is_active and role == "analyst":
+            active_admins = db.scalar(
+                select(func.count()).select_from(User).where(User.role == "admin", User.is_active.is_(True))
+            ) or 0
+            if active_admins <= 1:
+                print("Cannot demote the last active admin.", file=sys.stderr)
+                return 1
+        if user.role == role:
+            print(f"User {normalised} already has role {role}.")
+            return 0
+        user.role = role
+        db.commit()
+        audit.record(db, "user_role_changed", target=normalised, detail=f"role={role}")
+    print(f"Set role to {role} for {normalised}.")
+    return 0
+
+
 def _seed(count: int) -> int:
     factory = get_session_factory()
     if factory is None:
@@ -64,12 +123,23 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--email", required=True)
     create.add_argument("--role", required=True, choices=ROLES)
 
+    set_password = sub.add_parser("set-password", help="Reset an existing user's password")
+    set_password.add_argument("--email", required=True)
+
+    set_role = sub.add_parser("set-role", help="Set an existing user's role")
+    set_role.add_argument("--email", required=True)
+    set_role.add_argument("--role", required=True, choices=ROLES)
+
     seed = sub.add_parser("seed-simulated", help="Insert clearly labelled simulated alerts")
     seed.add_argument("--count", type=int, default=48, choices=range(1, 501), metavar="1-500")
 
     args = parser.parse_args(argv)
     if args.command == "create-user":
         return _create_user(args.email, args.role)
+    if args.command == "set-password":
+        return _set_password(args.email)
+    if args.command == "set-role":
+        return _set_role(args.email, args.role)
     return _seed(args.count)
 
 

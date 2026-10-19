@@ -2,6 +2,12 @@
 
 AI-assisted Security Operations Center dashboard. Stage 2: Codespaces environment, Postgres, API health check, and Nginx.
 
+## Google sign-in and registration
+
+Create a Google OAuth 2.0 **Web application** client in Google Cloud Console and add the dashboard's exact URL origin under **Authorized JavaScript origins** (for example, `http://localhost:8080` or the Codespaces forwarded HTTPS origin). Put its client ID in `.env` as `GOOGLE_CLIENT_ID`. The client ID is public; Google ID tokens are verified by the API.
+
+On the sign-in page, users can continue with Google to sign in or register. New verified Google accounts are assigned the Analyst role; an existing account keeps its current role. Users cannot choose or self-assign Admin access. Bootstrap an administrator with the CLI below using the same Google account email. Admins and SOC Analysts can view accounts in the dashboard's **Users** section and use `GET /api/v1/admin/users`. Analysts can assign the Analyst role; only Admins can grant the Admin role, create accounts, or view audit logs. Role updates use `PATCH /api/v1/admin/users/{user_id}/role` with body `{"role":"admin"}` or `{"role":"analyst"}`. The last active Admin cannot be demoted. Existing email-and-password login remains available.
+
 ## Run in Codespaces
 
 1. Open the repository in a Codespace.
@@ -17,14 +23,23 @@ AI-assisted Security Operations Center dashboard. Stage 2: Codespaces environmen
 
 ## First-time setup (after the stack is healthy)
 
-Migrations run automatically when the API starts. Then create the first administrator. The password is typed at a prompt and never passed as an argument:
+Migrations run automatically when the API starts. Then create the first administrator. Use the Google account email if they will sign in with Google. The password is typed at a prompt and never passed as an argument:
 
 ```bash
 docker compose exec api python -m app.cli create-user --email you@example.com --role admin
 docker compose exec api python -m app.cli seed-simulated --count 48
 ```
 
-Analysts are created by an administrator from the admin API (`POST /api/v1/admin/users`).
+Analysts can register with Google from the sign-in page or be created by an administrator through `POST /api/v1/admin/users`.
+
+If the account already exists (for example, it registered with Google first), `create-user` will not modify it. To reset its password or promote it to Admin from the operator shell, run:
+
+```bash
+docker compose exec api python -m app.cli set-password --email you@example.com
+docker compose exec api python -m app.cli set-role --email you@example.com --role admin
+```
+
+The password reset prompts interactively and does not put the password in shell history. The CLI will not demote the last active Admin.
 
 ## Gemini AI analysis
 
@@ -36,8 +51,18 @@ Set `GEMINI_API_KEY` in Codespaces Secrets or `.env`. Without it, the analysis b
 cd backend && pip install -r requirements.txt && pytest -q
 ```
 
+## Production readiness
+
+This repository is a development preview, not a production SOC deployment. Before production:
+
+- Connect and validate the chosen monitoring sources. The current dashboard uses simulated alerts; Wazuh and Suricata integrations are not implemented. Do not seed simulated alerts in a production database.
+- Terminate HTTPS at the deployment boundary and configure the production domain, Google OAuth authorized origins, and narrow CORS origins.
+- Replace all placeholder credentials with strong production secrets stored outside the repository. Use a production database and verify migrations and health checks in the deployment environment.
+- Decide whether Gemini analysis is enabled. Review the alert fields sent to Google and applicable data-handling requirements before configuring `GEMINI_API_KEY`.
+- Set up database backups and restore testing, centralized logs and monitoring, deployment rollback procedures, and end-to-end tests for authentication and alert workflows.
+
 ## Notes
 
 - Postgres and the API are not published to the host. Only Nginx on port 8080 is reachable.
 - Secrets must never be committed. Use Codespaces Secrets for real values.
-- Not production-ready: HTTPS is configured at the deployment boundary (see later stages).
+- HTTPS must be configured at the deployment boundary; the local Nginx container serves HTTP only.

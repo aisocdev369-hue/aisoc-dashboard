@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = ""
     jwt_algorithm: str = "HS256"
     jwt_access_token_minutes: int = 60
+    google_client_id: str = ""
 
     # Gemini (Google AI Studio). An empty key disables AI analysis.
     gemini_api_key: str = ""

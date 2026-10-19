@@ -8,6 +8,7 @@
   "use strict";
 
   var API = "/api/v1";
+  var THEME_KEY = "aisoc-theme";
   var SEV_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
   var SEV_ORDER = ["critical", "high", "medium", "low"];
   var SEV_COLOR = {
@@ -18,6 +19,39 @@
   var session = { token: null, user: null };
   var overview = { alerts: [] };
   var table = { q: "", severity: "all", status: "all", page: 1, pageSize: 25, total: 0, rows: [], selectedId: null };
+
+  function applyTheme(theme, persist) {
+    document.documentElement.dataset.theme = theme;
+    document.querySelectorAll("[data-theme-toggle]").forEach(function (button) {
+      var nextTheme = theme === "dark" ? "light" : "dark";
+      button.setAttribute("aria-label", "Switch to " + nextTheme + " theme");
+      button.setAttribute("title", "Switch to " + nextTheme + " theme");
+      button.setAttribute("aria-pressed", String(theme === "light"));
+      button.querySelector(".theme-icon").textContent = nextTheme === "light" ? "☼" : "☾";
+    });
+    if (persist) {
+      try {
+        window.localStorage.setItem(THEME_KEY, theme);
+      } catch (error) {
+        // The selected theme remains active for this page if storage is unavailable.
+      }
+    }
+  }
+
+  function initTheme() {
+    var savedTheme = null;
+    try {
+      savedTheme = window.localStorage.getItem(THEME_KEY);
+    } catch (error) {
+      savedTheme = null;
+    }
+    var systemTheme = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    applyTheme(savedTheme === "light" || savedTheme === "dark" ? savedTheme : systemTheme, false);
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest("[data-theme-toggle]")) return;
+      applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark", true);
+    });
+  }
 
   /* ---------- helpers ---------- */
   function h(tag, props, kids) {
@@ -96,6 +130,9 @@
     $("app").hidden = false;
     $("user-email").textContent = session.user.email;
     $("user-role").textContent = session.user.role === "admin" ? "Admin" : "SOC Analyst";
+    $("users-nav").hidden = session.user.role !== "admin" && session.user.role !== "analyst";
+    $("users").hidden = true;
+    if (session.user.role === "admin") loadUsers();
   }
 
   function signOut(message) {
@@ -124,6 +161,76 @@
     }).catch(function (err) {
       if (err.message !== "unauthenticated") setMessage("login-error", err.message);
     }).then(function () { btn.disabled = false; });
+  }
+
+  function configureGoogleSignIn() {
+    fetch(API + "/auth/google/config", { headers: { "Accept": "application/json" } })
+      .then(function (response) {
+        if (!response.ok) throw new Error("Could not load Google sign-in settings.");
+        return response.json();
+      })
+      .then(function (config) {
+        if (!config.enabled || !config.client_id) {
+          $("google-signin-status").textContent = "Google sign-in is not configured. Email and password sign-in is still available.";
+          $("google-signin-status").hidden = false;
+          return;
+        }
+
+        var script = document.createElement("script");
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.onload = function () {
+          if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+            $("google-signin-status").textContent = "Google sign-in could not be initialized. Try email and password sign-in.";
+            $("google-signin-status").hidden = false;
+            return;
+          }
+          window.google.accounts.id.initialize({
+            client_id: config.client_id,
+            callback: onGoogleCredential
+          });
+          $("google-signin").hidden = false;
+          window.google.accounts.id.renderButton($("google-signin"), {
+            theme: "filled_black",
+            size: "large",
+            text: "continue_with",
+            shape: "rectangular",
+            width: 320
+          });
+        };
+        script.onerror = function () {
+          $("google-signin-status").textContent = "Google sign-in could not load. Try email and password sign-in.";
+          $("google-signin-status").hidden = false;
+        };
+        document.head.appendChild(script);
+      })
+      .catch(function () {
+        $("google-signin-status").textContent = "Google sign-in is currently unavailable. Email and password sign-in is still available.";
+        $("google-signin-status").hidden = false;
+      });
+  }
+
+  function onGoogleCredential(response) {
+    if (!response || typeof response.credential !== "string" || !response.credential) {
+      setMessage("login-error", "Google did not return a valid sign-in credential. Please try again.");
+      return;
+    }
+    setMessage("login-error", "");
+    api("/auth/google", {
+      method: "POST",
+      body: { credential: response.credential }
+    }).then(function (tok) {
+      session.token = tok.access_token;
+      return api("/auth/me");
+    }).then(function (me) {
+      session.user = me;
+      showApp();
+      loadAll();
+    }).catch(function (err) {
+      session.token = null;
+      session.user = null;
+      setMessage("login-error", err.message || "Google sign-in failed. Please try again.");
+    });
   }
 
   /* ---------- Overview (KPIs, charts) ---------- */
@@ -448,17 +555,29 @@
     $("cancel-password").addEventListener("click", closePasswordModal);
     $("password-form").addEventListener("submit", onChangePassword);
     $("login-form").addEventListener("submit", onLogin);
-    $("toggle-password").addEventListener("click", togglePasswordVisibility);
+    bindPasswordToggle("login-password", "toggle-password", "toggle-password-label", "toggle-password-icon", "password", true);
+    bindPasswordToggle("current-password", "toggle-current-password", null, "toggle-current-password-icon", "current password");
+    bindPasswordToggle("new-password", "toggle-new-password", null, "toggle-new-password-icon", "new password");
+    bindPasswordToggle("confirm-password", "toggle-confirm-password", null, "toggle-confirm-password-icon", "confirmation password");
   }
 
-  function togglePasswordVisibility() {
-    var input = $("login-password");
-    var btn = $("toggle-password");
+  function bindPasswordToggle(inputId, buttonId, labelId, iconId, passwordLabel, hasScreenReaderLabel) {
+    $(buttonId).addEventListener("click", function () {
+      togglePasswordVisibility(inputId, buttonId, labelId, iconId, passwordLabel, hasScreenReaderLabel);
+    });
+  }
+
+  function togglePasswordVisibility(inputId, buttonId, labelId, iconId, passwordLabel, hasScreenReaderLabel) {
+    var input = $(inputId);
+    var btn = $(buttonId);
     var shown = input.type === "text";
     input.type = shown ? "password" : "text";
     btn.setAttribute("aria-pressed", String(!shown));
-    $("toggle-password-label").textContent = shown ? "Show password" : "Hide password";
-    $("toggle-password-icon").textContent = shown ? "\u{1F441}" : "\u{1F576}";
+    btn.setAttribute("aria-label", (shown ? "Show " : "Hide ") + passwordLabel);
+    if (hasScreenReaderLabel) {
+      $(labelId).textContent = shown ? "Show password" : "Hide password";
+    }
+    $(iconId).textContent = shown ? "\u{1F441}" : "\u{1F576}";
     input.focus();
   }
 
@@ -473,6 +592,16 @@
 
   function resetPasswordForm() {
     $("password-form").reset();
+    [
+      ["current-password", "toggle-current-password", "toggle-current-password-icon", "current password"],
+      ["new-password", "toggle-new-password", "toggle-new-password-icon", "new password"],
+      ["confirm-password", "toggle-confirm-password", "toggle-confirm-password-icon", "confirmation password"]
+    ].forEach(function (ids) {
+      $(ids[0]).type = "password";
+      $(ids[1]).setAttribute("aria-pressed", "false");
+      $(ids[1]).setAttribute("aria-label", "Show " + ids[3]);
+      $(ids[2]).textContent = "\u{1F441}";
+    });
     setPasswordFeedback("", "");
   }
 
@@ -535,9 +664,69 @@
     renderTimeline();
   }
 
+  function loadUsers() {
+    if (!session.user || (session.user.role !== "admin" && session.user.role !== "analyst")) return;
+    setMessage("users-error", "");
+    api("/admin/users").then(function (users) {
+      renderUsers(users);
+    }).catch(function (err) {
+      if (err.message !== "unauthenticated") {
+        setMessage("users-error", "Could not load users: " + err.message);
+      }
+    });
+  }
+
+  function renderUsers(users) {
+    var body = clear($("user-rows"));
+    var canAssignAdmin = session.user.role === "admin";
+    $("users-count").textContent = users.length + (users.length === 1 ? " account" : " accounts");
+    $("users-empty").hidden = users.length !== 0;
+    users.forEach(function (user) {
+      var adminOption = h("option", { value: "admin", text: "Admin" });
+      adminOption.disabled = !canAssignAdmin;
+      var role = h("select", { "aria-label": "Role for " + user.email }, [
+        h("option", { value: "analyst", text: "Analyst" }),
+        adminOption
+      ]);
+      role.value = user.role;
+      var save = h("button", { type: "button", class: "btn btn-ghost", text: "Save role" });
+      save.disabled = true;
+      role.addEventListener("change", function () {
+        save.disabled = role.value === user.role;
+      });
+      save.addEventListener("click", function () {
+        save.disabled = true;
+        setMessage("users-error", "");
+        api("/admin/users/" + encodeURIComponent(user.id) + "/role", {
+          method: "PATCH",
+          body: { role: role.value }
+        }).then(function () {
+          loadUsers();
+        }).catch(function (err) {
+          if (err.message !== "unauthenticated") {
+            setMessage("users-error", "Could not update role for " + user.email + ": " + err.message);
+          }
+          save.disabled = role.value === user.role;
+        });
+      });
+      body.appendChild(h("tr", null, [
+        h("td", { text: user.email }),
+        h("td", null, [role]),
+        h("td", { text: user.is_active ? "Active" : "Inactive" }),
+        h("td", null, [save])
+      ]));
+    });
+  }
+
   function init() {
+    initTheme();
     bindFilters();
+    $("users-nav").addEventListener("click", function () {
+      $("users").hidden = false;
+      loadUsers();
+    });
     showLogin("");
+    configureGoogleSignIn();
   }
 
   init();
