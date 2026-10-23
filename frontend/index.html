@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AISOC · Security Operations Dashboard</title>
   <meta name="description" content="AI-assisted SOC dashboard. Development preview using simulated data.">
-  <link rel="stylesheet" href="assets/styles.css?v=3">
+  <link rel="stylesheet" href="assets/styles.css?v=5">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -132,25 +132,22 @@
           <p class="muted">Last 24 hours</p>
         </div>
 
-        <div class="kpis" id="kpis"></div>
+        <div class="bento-grid">
+          <div class="kpis" id="kpis"></div>
 
-        <div class="grid-2">
-          <article class="card">
+          <article class="card bento-trend">
             <h2>Alert trend</h2>
             <div id="trend"></div>
           </article>
-          <article class="card">
+          <article class="card bento-severity">
             <h2>Severity distribution</h2>
             <div id="severity"></div>
           </article>
-        </div>
-
-        <div class="grid-2">
-          <article class="card">
+          <article class="card bento-hosts">
             <h2>Top targeted hosts</h2>
             <div id="hosts"></div>
           </article>
-          <article class="card" id="incident">
+          <article class="card bento-incident" id="incident">
             <h2>Incident timeline <span class="tag tag-sim">Simulated</span></h2>
             <div id="timeline"></div>
           </article>
