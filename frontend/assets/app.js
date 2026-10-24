@@ -121,6 +121,7 @@
   function showLogin(message) {
     $("app").hidden = true;
     $("login").hidden = false;
+    showLoginForm();
     setMessage("login-error", message || "");
     $("login-email").focus();
   }
@@ -161,6 +162,60 @@
     }).catch(function (err) {
       if (err.message !== "unauthenticated") setMessage("login-error", err.message);
     }).then(function () { btn.disabled = false; });
+  }
+
+  function onRegister(event) {
+    event.preventDefault();
+    var password = $("signup-password").value;
+    if (password !== $("signup-confirm-password").value) {
+      setMessage("signup-error", "Passwords do not match.");
+      return;
+    }
+
+    var button = $("signup-submit");
+    button.disabled = true;
+    setMessage("signup-error", "");
+    api("/auth/register", {
+      method: "POST",
+      body: { email: $("signup-email").value.trim(), password: password }
+    }).then(function (tok) {
+      session.token = tok.access_token;
+      $("signup-password").value = "";
+      $("signup-confirm-password").value = "";
+      return api("/auth/me");
+    }).then(function (me) {
+      session.user = me;
+      showApp();
+      loadAll();
+    }).catch(function (err) {
+      session.token = null;
+      session.user = null;
+      if (err.message !== "unauthenticated") setMessage("signup-error", err.message || "Could not create the account.");
+    }).then(function () {
+      button.disabled = false;
+    });
+  }
+
+  function showSignup() {
+    $("login-form").hidden = true;
+    $("signup-form").hidden = false;
+    $("login-title").textContent = "Create Analyst account";
+    $("auth-description").textContent = "Create an account to access the security dashboard.";
+    $("auth-divider").textContent = "Email and password registration";
+    setMessage("login-error", "");
+    $("signup-email").value = $("login-email").value;
+    $("signup-email").focus();
+  }
+
+  function showLoginForm() {
+    $("signup-form").hidden = true;
+    $("login-form").hidden = false;
+    $("login-title").textContent = "Sign in";
+    $("auth-description").textContent = "Sign in or create an Analyst account with your email and password. Google sign-in is also available.";
+    $("auth-divider").textContent = "or continue with email and password";
+    setMessage("signup-error", "");
+    $("login-email").value = $("signup-email").value;
+    $("login-email").focus();
   }
 
   function configureGoogleSignIn() {
@@ -679,15 +734,27 @@
   function renderUsers(users) {
     var body = clear($("user-rows"));
     var canAssignAdmin = session.user.role === "admin";
+    var activeAdminCount = users.filter(function (user) {
+      return user.is_active && user.role === "admin";
+    }).length;
     $("users-count").textContent = users.length + (users.length === 1 ? " account" : " accounts");
     $("users-empty").hidden = users.length !== 0;
     users.forEach(function (user) {
+      var analystOption = h("option", { value: "analyst", text: "Analyst" });
       var adminOption = h("option", { value: "admin", text: "Admin" });
+      var isLastActiveAdmin = user.is_active && user.role === "admin" && activeAdminCount === 1;
+      if (isLastActiveAdmin) {
+        analystOption.disabled = true;
+        analystOption.textContent = "Analyst (last active Admin protected)";
+      }
       adminOption.disabled = !canAssignAdmin;
       var role = h("select", { "aria-label": "Role for " + user.email }, [
-        h("option", { value: "analyst", text: "Analyst" }),
+        analystOption,
         adminOption
       ]);
+      if (isLastActiveAdmin) {
+        role.title = "Promote another active account to Admin before demoting this account.";
+      }
       role.value = user.role;
       var save = h("button", { type: "button", class: "btn btn-ghost", text: "Save role" });
       save.disabled = true;
@@ -706,7 +773,8 @@
           if (err.message !== "unauthenticated") {
             setMessage("users-error", "Could not update role for " + user.email + ": " + err.message);
           }
-          save.disabled = role.value === user.role;
+          role.value = user.role;
+          save.disabled = true;
         });
       });
       body.appendChild(h("tr", null, [
@@ -721,6 +789,17 @@
   function init() {
     initTheme();
     bindFilters();
+    $("signup-form").addEventListener("submit", onRegister);
+    $("show-signup").addEventListener("click", showSignup);
+    $("show-login").addEventListener("click", showLoginForm);
+    $("toggle-signup-password").addEventListener("click", function () {
+      var input = $("signup-password");
+      var visible = input.type === "password";
+      input.type = visible ? "text" : "password";
+      $("toggle-signup-password").setAttribute("aria-pressed", String(visible));
+      $("toggle-signup-password-label").textContent = visible ? "Hide password" : "Show password";
+      $("toggle-signup-password").setAttribute("aria-label", visible ? "Hide password" : "Show password");
+    });
     $("users-nav").addEventListener("click", function () {
       $("users").hidden = false;
       loadUsers();

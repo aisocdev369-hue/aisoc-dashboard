@@ -19,6 +19,7 @@ from app.schemas import (
     GoogleAuthConfig,
     GoogleCredentialRequest,
     LoginRequest,
+    RegisterRequest,
     TokenOut,
     UserOut,
 )
@@ -51,6 +52,28 @@ def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -
 
     token, ttl = create_access_token(user.id, user.role)
     audit.record(db, "login", actor_id=user.id, ip=ip)
+    return TokenOut(access_token=token, expires_in=ttl, role=user.role)
+
+
+@router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
+def register(body: RegisterRequest, request: Request, db: Session = Depends(get_db)) -> TokenOut:
+    email = str(body.email).lower()
+    user = User(
+        email=email,
+        hashed_password=hash_password(body.password),
+        role="analyst",
+        is_active=True,
+    )
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists") from exc
+
+    db.refresh(user)
+    audit.record(db, "register", actor_id=user.id, target=email, ip=_client_ip(request))
+    token, ttl = create_access_token(user.id, user.role)
     return TokenOut(access_token=token, expires_in=ttl, role=user.role)
 
 

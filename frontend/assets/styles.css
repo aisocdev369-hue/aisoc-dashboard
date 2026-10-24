@@ -321,6 +321,7 @@ tbody tr:focus-visible { outline-offset: -2px; }
 .login-card { width: min(460px, 100%); gap: 18px; padding: 30px; }
 .login-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .login-form { display: grid; gap: 14px; }
+.auth-switch { width: 100%; }
 .login-form label { display: grid; gap: 6px; font-size: 0.85rem; color: var(--muted); }
 .login-form input {
   font: inherit; color: var(--text); background: var(--control-bg);
@@ -396,7 +397,7 @@ tbody tr:focus-visible { outline-offset: -2px; }
 
 /* ---------- Small screens ---------- */
 @media (max-width: 640px) {
-  .topbar nav { order: 3; width: 100%; overflow-x: auto; }
+  .topbar nav { order: 3; width: 100%; overflow-x: auto; align-items: center; }
   .status { display: none; }
   .kpi-value { font-size: 1.6rem; }
   .bars li { grid-template-columns: 96px 1fr auto; }

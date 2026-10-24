@@ -17,6 +17,46 @@ def test_login_email_is_case_insensitive(make_user, login):
     assert login("ADMIN@Example.com").status_code == 200
 
 
+def test_email_registration_creates_analyst_and_signs_in(client, session_factory):
+    password = "a-long-enough-password"
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"email": "New.Analyst@example.com", "password": password},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["role"] == "analyst"
+    headers = {"Authorization": f"Bearer {response.json()['access_token']}"}
+    assert client.get("/api/v1/auth/me", headers=headers).json()["email"] == "new.analyst@example.com"
+    with session_factory() as db:
+        user = db.query(User).filter_by(email="new.analyst@example.com").one()
+        assert user.role == "analyst"
+        assert user.hashed_password != password
+        assert [row.action for row in db.query(AuditLog).all()] == ["register"]
+
+
+def test_email_registration_rejects_duplicate_short_password_and_role(client):
+    payload = {"email": "new.analyst@example.com", "password": "a-long-enough-password"}
+    assert client.post("/api/v1/auth/register", json=payload).status_code == 201
+    assert client.post("/api/v1/auth/register", json=payload).status_code == 409
+    assert client.post(
+        "/api/v1/auth/register",
+        json={"email": "short@example.com", "password": "short"},
+    ).status_code == 422
+    assert client.post(
+        "/api/v1/auth/register",
+        json={**payload, "email": "role@example.com", "role": "admin"},
+    ).status_code == 422
+
+
+def test_email_registration_rejects_password_over_bcrypt_byte_limit(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"email": "unicode@example.com", "password": "é" * 37},
+    )
+    assert response.status_code == 422
+
+
 def test_google_sign_in_registers_analyst_and_then_logs_in(client, session_factory, settings, monkeypatch):
     settings.google_client_id = "test-google-client-id"
     monkeypatch.setattr(
