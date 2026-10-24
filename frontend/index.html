@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AISOC · Security Operations Dashboard</title>
   <meta name="description" content="AI-assisted SOC dashboard. Development preview using simulated data.">
-  <link rel="stylesheet" href="assets/styles.css?v=3">
+  <link rel="stylesheet" href="assets/styles.css?v=6">
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
@@ -23,10 +23,10 @@
         </button>
       </div>
       <h1 id="login-title">Sign in</h1>
-      <p class="muted">Sign in or register with a verified Google account. New accounts are assigned the Analyst role.</p>
+      <p id="auth-description" class="muted">Sign in or create an Analyst account with your email and password. Google sign-in is also available.</p>
       <div id="google-signin" class="google-signin" hidden></div>
       <p id="google-signin-status" class="muted" role="status" hidden></p>
-      <div class="login-divider"><span>or sign in with email and password</span></div>
+      <div class="login-divider"><span id="auth-divider">or continue with email and password</span></div>
       <form id="login-form" class="login-form" novalidate>
         <label>
           <span>Email</span>
@@ -44,6 +44,31 @@
         </label>
         <p id="login-error" class="form-error" role="alert" hidden></p>
         <button id="login-submit" class="btn btn-primary" type="submit">Sign in</button>
+        <button id="show-signup" class="btn btn-ghost auth-switch" type="button">Create Analyst account</button>
+      </form>
+      <form id="signup-form" class="login-form" novalidate hidden>
+        <label>
+          <span>Email</span>
+          <input id="signup-email" type="email" autocomplete="email" required maxlength="255">
+        </label>
+        <label>
+          <span>Password (at least 12 characters)</span>
+          <div class="password-field">
+            <input id="signup-password" type="password" autocomplete="new-password" required minlength="12" maxlength="72">
+            <button type="button" id="toggle-signup-password" class="toggle-password" aria-pressed="false">
+              <span class="sr-only" id="toggle-signup-password-label">Show password</span>
+              <span aria-hidden="true" id="toggle-signup-password-icon">&#128065;</span>
+            </button>
+          </div>
+        </label>
+        <label>
+          <span>Confirm password</span>
+          <input id="signup-confirm-password" type="password" autocomplete="new-password" required minlength="12" maxlength="72">
+        </label>
+        <p class="muted small">New accounts are created with the Analyst role. Admin access can only be granted by an Admin.</p>
+        <p id="signup-error" class="form-error" role="alert" hidden></p>
+        <button id="signup-submit" class="btn btn-primary" type="submit">Create Analyst account</button>
+        <button id="show-login" class="btn btn-ghost auth-switch" type="button">Back to sign in</button>
       </form>
     </div>
   </section>
@@ -132,25 +157,22 @@
           <p class="muted">Last 24 hours</p>
         </div>
 
-        <div class="kpis" id="kpis"></div>
+        <div class="bento-grid">
+          <div class="kpis" id="kpis"></div>
 
-        <div class="grid-2">
-          <article class="card">
+          <article class="card bento-trend">
             <h2>Alert trend</h2>
             <div id="trend"></div>
           </article>
-          <article class="card">
+          <article class="card bento-severity">
             <h2>Severity distribution</h2>
             <div id="severity"></div>
           </article>
-        </div>
-
-        <div class="grid-2">
-          <article class="card">
+          <article class="card bento-hosts">
             <h2>Top targeted hosts</h2>
             <div id="hosts"></div>
           </article>
-          <article class="card" id="incident">
+          <article class="card bento-incident" id="incident">
             <h2>Incident timeline <span class="tag tag-sim">Simulated</span></h2>
             <div id="timeline"></div>
           </article>
@@ -250,6 +272,6 @@
   </div>
 
   <script src="assets/mock-data.js"></script>
-  <script src="assets/app.js?v=3"></script>
+  <script src="assets/app.js?v=6"></script>
 </body>
 </html>

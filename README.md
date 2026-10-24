@@ -6,7 +6,7 @@ AI-assisted Security Operations Center dashboard. Stage 2: Codespaces environmen
 
 Create a Google OAuth 2.0 **Web application** client in Google Cloud Console and add the dashboard's exact URL origin under **Authorized JavaScript origins** (for example, `http://localhost:8080` or the Codespaces forwarded HTTPS origin). Put its client ID in `.env` as `GOOGLE_CLIENT_ID`. The client ID is public; Google ID tokens are verified by the API.
 
-On the sign-in page, users can continue with Google to sign in or register. New verified Google accounts are assigned the Analyst role; an existing account keeps its current role. Users cannot choose or self-assign Admin access. Bootstrap an administrator with the CLI below using the same Google account email. Admins and SOC Analysts can view accounts in the dashboard's **Users** section and use `GET /api/v1/admin/users`. Analysts can assign the Analyst role; only Admins can grant the Admin role, create accounts, or view audit logs. Role updates use `PATCH /api/v1/admin/users/{user_id}/role` with body `{"role":"admin"}` or `{"role":"analyst"}`. The last active Admin cannot be demoted. Existing email-and-password login remains available.
+On the sign-in page, users can create an Analyst account with an email and password or continue with Google. Email registration requires a password of at least 12 characters. New accounts are always assigned the Analyst role; users cannot choose or self-assign Admin access. Existing accounts can sign in with email and password or Google. Bootstrap an administrator with the CLI below using the same Google account email. Admins and SOC Analysts can view accounts in the dashboard's **Users** section and use `GET /api/v1/admin/users`. Analysts can assign the Analyst role; only Admins can grant the Admin role, create accounts, or view audit logs. Role updates use `PATCH /api/v1/admin/users/{user_id}/role` with body `{"role":"admin"}` or `{"role":"analyst"}`. The last active Admin cannot be demoted.
 
 ## Run in Codespaces
 
@@ -30,7 +30,7 @@ docker compose exec api python -m app.cli create-user --email you@example.com --
 docker compose exec api python -m app.cli seed-simulated --count 48
 ```
 
-Analysts can register with Google from the sign-in page or be created by an administrator through `POST /api/v1/admin/users`.
+Analysts can register from the sign-in page with email and password or Google, or be created by an administrator through `POST /api/v1/admin/users`.
 
 If the account already exists (for example, it registered with Google first), `create-user` will not modify it. To reset its password or promote it to Admin from the operator shell, run:
 
