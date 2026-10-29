@@ -11,7 +11,7 @@ import argparse
 import getpass
 import sys
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from app.core.security import hash_password
 from app.db.models import ROLES, User
@@ -84,14 +84,17 @@ def _set_role(email: str, role: str) -> int:
         return 2
     normalised = email.strip().lower()
     with factory() as db:
-        user = db.scalar(select(User).where(User.email == normalised))
+        lock_stmt = select(User).order_by(User.id)
+        if db.bind is not None and db.bind.dialect.name == "postgresql":
+            db.execute(text("SELECT pg_advisory_xact_lock(hashtext('soc-admin-role-change'))"))
+            lock_stmt = lock_stmt.with_for_update()
+        users = db.scalars(lock_stmt.execution_options(populate_existing=True)).all()
+        user = next((row for row in users if row.email == normalised), None)
         if user is None:
             print("No user with this email exists.", file=sys.stderr)
             return 1
         if user.role == "admin" and user.is_active and role == "analyst":
-            active_admins = db.scalar(
-                select(func.count()).select_from(User).where(User.role == "admin", User.is_active.is_(True))
-            ) or 0
+            active_admins = sum(1 for row in users if row.role == "admin" and row.is_active)
             if active_admins <= 1:
                 print("Cannot demote the last active admin.", file=sys.stderr)
                 return 1

@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.request import client_ip
 from app.db.models import AIAnalysis, Alert, User
 from app.db.session import get_db
 from app.deps import require_roles
@@ -15,10 +16,6 @@ from app.services import audit, gemini
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["ai"])
 ANALYST_OR_ADMIN = require_roles("admin", "analyst")
-
-
-def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
 
 
 @router.post("/{external_id}/analysis", response_model=AnalysisOut, status_code=201)
@@ -33,7 +30,7 @@ def run_analysis(
         raise HTTPException(status_code=404, detail="Alert not found")
 
     settings = get_settings()
-    ip = _client_ip(request)
+    ip = client_ip(request)
 
     # Usage control: cap AI calls per user per hour. Failed attempts count too.
     window_start = datetime.now(timezone.utc) - timedelta(hours=1)

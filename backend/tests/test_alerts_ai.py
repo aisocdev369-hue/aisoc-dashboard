@@ -49,6 +49,16 @@ def test_alert_list_is_paginated_and_filtered(make_user, auth_header, client, se
     assert len(page["items"]) == 1
 
 
+def test_since_filter_excludes_older_alerts(make_user, auth_header, client, seed_alerts):
+    make_user("analyst@example.com", "analyst")
+    response = client.get(
+        "/api/v1/alerts?since=2026-10-06T08:55:00%2B00:00",
+        headers=auth_header("analyst@example.com"),
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+
+
 def test_search_treats_wildcards_literally(make_user, auth_header, client, seed_alerts):
     make_user("analyst@example.com", "analyst")
     resp = client.get("/api/v1/alerts?q=%25", headers=auth_header("analyst@example.com"))

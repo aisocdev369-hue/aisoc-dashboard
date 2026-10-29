@@ -24,8 +24,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # Not published to the host. Nginx is the only public entry point.
+    # Not published to the host. Only Nginx's fixed address is trusted for proxy headers.
     expose: ["8000"]
+    environment:
+      FORWARDED_ALLOW_IPS: 172.29.240.2
     networks: [soc-net]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status==200 else 1)"]
@@ -45,7 +47,9 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./frontend:/usr/share/nginx/html:ro
-    networks: [soc-net]
+    networks:
+      soc-net:
+        ipv4_address: 172.29.240.2
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
       interval: 10s
@@ -56,6 +60,9 @@ services:
 networks:
   soc-net:
     name: soc-net
+    ipam:
+      config:
+        - subnet: 172.29.240.0/24
 
 volumes:
   pgdata:

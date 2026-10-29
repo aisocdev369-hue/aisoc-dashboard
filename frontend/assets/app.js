@@ -17,7 +17,7 @@
   };
 
   var session = { token: null, user: null };
-  var overview = { alerts: [] };
+  var overview = { alerts: [], total: 0 };
   var table = { q: "", severity: "all", status: "all", page: 1, pageSize: 25, total: 0, rows: [], selectedId: null };
 
   function applyTheme(theme, persist) {
@@ -290,19 +290,29 @@
 
   /* ---------- Overview (KPIs, charts) ---------- */
   function loadOverview() {
-    return api("/alerts?page_size=100").then(function (page) {
-      overview.alerts = page.items;
-      renderKPIs();
-      renderTrend();
-      renderSeverity();
-      renderHosts();
-    });
+    var now = new Date();
+    var since = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    var until = now.toISOString();
+    function loadPage(pageNumber, accumulated) {
+      var qs = "?page=" + pageNumber + "&page_size=100&since=" + encodeURIComponent(since) + "&until=" + encodeURIComponent(until);
+      return api("/alerts" + qs).then(function (page) {
+        var rows = accumulated.concat(page.items);
+        if (rows.length < page.total && page.items.length) return loadPage(pageNumber + 1, rows);
+        overview.alerts = rows;
+        overview.total = page.total;
+        renderKPIs();
+        renderTrend();
+        renderSeverity();
+        renderHosts();
+      });
+    }
+    return loadPage(1, []);
   }
 
   function renderKPIs() {
     var a = overview.alerts;
     var items = [
-      { label: "Alerts (24h)", value: a.length, sub: "Simulated data", cls: "" },
+      { label: "Alerts (24h)", value: overview.total, sub: "Simulated data", cls: "" },
       { label: "Critical", value: count(a, function (x) { return x.severity === "critical"; }), sub: "Needs immediate triage", cls: "kpi-critical" },
       { label: "High", value: count(a, function (x) { return x.severity === "high"; }), sub: "Triage within one hour", cls: "kpi-high" },
       { label: "Open cases", value: count(a, function (x) { return x.status !== "Closed"; }),

@@ -5,11 +5,10 @@
 (function () {
   "use strict";
 
-  var ANCHOR = Date.UTC(2026, 9, 6, 9, 30);
   var HOUR = 60 * 60 * 1000;
 
   function at(hoursAgo) {
-    return new Date(ANCHOR - hoursAgo * HOUR).toISOString();
+    return new Date(Date.now() - hoursAgo * HOUR).toISOString();
   }
 
   window.SOC_MOCK_INCIDENT = {

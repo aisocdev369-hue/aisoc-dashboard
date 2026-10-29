@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import func, select
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.request import client_ip
 from app.core.security import hash_password
 from app.db.models import AuditLog, User
 from app.db.session import get_db
@@ -12,10 +14,6 @@ from app.services import audit
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 ADMIN_ONLY = require_roles("admin")
 USER_ROLE_MANAGERS = require_roles("admin", "analyst")
-
-
-def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
 
 
 @router.get("/users", response_model=list[UserOut])
@@ -37,9 +35,13 @@ def create_user(
 
     user = User(email=email, hashed_password=hash_password(body.password), role=body.role, is_active=True)
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A user with this email already exists") from exc
     db.refresh(user)
-    audit.record(db, "user_created", actor_id=admin.id, target=email, detail=f"role={body.role}", ip=_client_ip(request))
+    audit.record(db, "user_created", actor_id=admin.id, target=email, detail=f"role={body.role}", ip=client_ip(request))
     return UserOut.model_validate(user)
 
 
@@ -51,19 +53,24 @@ def update_user_role(
     manager: User = Depends(USER_ROLE_MANAGERS),
     db: Session = Depends(get_db),
 ) -> UserOut:
+    # Lock rows in a consistent order so concurrent role updates cannot both
+    # pass the last-active-admin check using the same stale count.
+    lock_stmt = select(User).order_by(User.id)
+    if db.bind is not None and db.bind.dialect.name == "postgresql":
+        # Serialize this critical section before taking a fresh READ COMMITTED snapshot.
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext('soc-admin-role-change'))"))
+        lock_stmt = lock_stmt.with_for_update()
+    locked_users = db.scalars(lock_stmt.execution_options(populate_existing=True)).all()
     if manager.role == "analyst" and body.role == "admin":
         raise HTTPException(status_code=403, detail="Only admins can assign the Admin role")
-
-    user = db.get(User, user_id)
+    user = next((row for row in locked_users if row.id == user_id), None)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     if user.role == body.role:
         return UserOut.model_validate(user)
 
     if user.is_active and user.role == "admin" and body.role == "analyst":
-        active_admins = db.scalar(
-            select(func.count()).select_from(User).where(User.role == "admin", User.is_active.is_(True))
-        ) or 0
+        active_admins = sum(1 for row in locked_users if row.is_active and row.role == "admin")
         if active_admins <= 1:
             raise HTTPException(status_code=409, detail="Cannot demote the last active admin")
 
@@ -76,7 +83,7 @@ def update_user_role(
         actor_id=manager.id,
         target=user.email,
         detail=f"role={body.role}",
-        ip=_client_ip(request),
+        ip=client_ip(request),
     )
     return UserOut.model_validate(user)
 

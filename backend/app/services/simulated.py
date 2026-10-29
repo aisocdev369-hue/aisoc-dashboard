@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Alert
 
-ANCHOR = datetime(2026, 10, 6, 9, 30, tzinfo=timezone.utc)
 HOSTS = [
     "srv-db-01", "dc-01", "srv-web-02", "vpn-gw-01",
     "ws-fin-01", "ws-hr-04", "ws-dev-07", "srv-mail-01",
@@ -35,12 +34,13 @@ def _documentation_ip(rng: random.Random) -> str:
 def seed_simulated_alerts(db: Session, count: int = 48, seed: int = 20261006) -> int:
     """Insert simulated alerts that do not already exist. Returns the number inserted."""
     rng = random.Random(seed)
+    anchor = datetime.now(timezone.utc)
     existing = set(db.scalars(select(Alert.external_id)).all())
     inserted = 0
     for i in range(count):
         external_id = f"AL-{1200 + i}"
         rule, severity, mitre = rng.choice(RULES)
-        occurred = ANCHOR - timedelta(minutes=rng.randint(0, 24 * 60 - 1))
+        occurred = anchor - timedelta(minutes=rng.randint(0, 24 * 60 - 1))
         host = rng.choice(HOSTS)
         source_ip = _documentation_ip(rng)
         status = rng.choice(STATUSES)

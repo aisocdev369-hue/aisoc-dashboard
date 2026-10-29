@@ -4,9 +4,20 @@ from typing import Literal
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
+def _validate_bcrypt_password(password: str) -> str:
+    if len(password.encode("utf-8")) > 72:
+        raise ValueError("Password must be at most 72 bytes")
+    return password
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=72)
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, password: str) -> str:
+        return _validate_bcrypt_password(password)
 
 
 class RegisterRequest(BaseModel):
@@ -18,9 +29,7 @@ class RegisterRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def password_fits_bcrypt(cls, password: str) -> str:
-        if len(password.encode("utf-8")) > 72:
-            raise ValueError("Password must be at most 72 bytes")
-        return password
+        return _validate_bcrypt_password(password)
 
 
 class GoogleCredentialRequest(BaseModel):
@@ -53,6 +62,11 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=12, max_length=72)
     role: Literal["admin", "analyst"]
 
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, password: str) -> str:
+        return _validate_bcrypt_password(password)
+
 
 class UserRoleUpdate(BaseModel):
     role: Literal["admin", "analyst"]
@@ -61,6 +75,11 @@ class UserRoleUpdate(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str = Field(min_length=1, max_length=72)
     new_password: str = Field(min_length=12, max_length=72)
+
+    @field_validator("current_password", "new_password")
+    @classmethod
+    def password_fits_bcrypt(cls, password: str) -> str:
+        return _validate_bcrypt_password(password)
 
 
 class AlertOut(BaseModel):
@@ -91,11 +110,11 @@ class AnalysisOut(BaseModel):
     model: str
     summary: str | None = None
     threat_assessment: str | None = None
-    mitre_techniques: list[str] = []
+    mitre_techniques: list[str] = Field(default_factory=list)
     business_impact: str | None = None
     confidence: str | None = None
     confidence_explanation: str | None = None
-    recommendations: list[str] = []
+    recommendations: list[str] = Field(default_factory=list)
     error_code: str | None = None
     created_at: datetime
 

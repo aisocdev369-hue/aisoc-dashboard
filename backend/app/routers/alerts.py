@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -53,10 +54,16 @@ def list_alerts(
     severity: Literal["critical", "high", "medium", "low"] | None = None,
     alert_status: Literal["New", "Investigating", "Closed"] | None = Query(None, alias="status"),
     q: str | None = Query(None, max_length=100),
+    since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
     _user: User = Depends(ANALYST_OR_ADMIN),
     db: Session = Depends(get_db),
 ) -> AlertPage:
     stmt = select(Alert)
+    if since:
+        stmt = stmt.where(Alert.occurred_at >= since)
+    if until:
+        stmt = stmt.where(Alert.occurred_at <= until)
     if severity:
         stmt = stmt.where(Alert.severity == severity)
     if alert_status:

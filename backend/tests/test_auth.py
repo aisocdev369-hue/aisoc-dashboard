@@ -57,6 +57,25 @@ def test_email_registration_rejects_password_over_bcrypt_byte_limit(client):
     assert response.status_code == 422
 
 
+def test_admin_create_rejects_password_over_bcrypt_byte_limit(make_user, auth_header, client):
+    make_user("admin@example.com", "admin")
+    response = client.post(
+        "/api/v1/admin/users",
+        json={"email": "unicode@example.com", "password": "é" * 37, "role": "analyst"},
+        headers=auth_header("admin@example.com"),
+    )
+    assert response.status_code == 422
+
+
+def test_change_password_rejects_password_over_bcrypt_byte_limit(make_user, auth_header, client):
+    make_user("analyst@example.com", "analyst")
+    response = client.post(
+        "/api/v1/auth/change-password",
+        json={"current_password": "correct-horse-battery-staple", "new_password": "é" * 37},
+        headers=auth_header("analyst@example.com"),
+    )
+    assert response.status_code == 422
+
 def test_google_sign_in_registers_analyst_and_then_logs_in(client, session_factory, settings, monkeypatch):
     settings.google_client_id = "test-google-client-id"
     monkeypatch.setattr(
@@ -269,6 +288,19 @@ def test_short_password_is_rejected(make_user, auth_header, client):
         headers=auth_header("admin@example.com"),
     )
     assert resp.status_code == 422
+
+
+def test_audit_does_not_trust_client_supplied_forwarding_headers(make_user, client, session_factory):
+    make_user("ip@example.com", "analyst")
+    response = client.post(
+        "/api/v1/auth/login",
+        json={"email": "ip@example.com", "password": "correct-horse-battery-staple"},
+        headers={"X-Real-IP": "203.0.113.8", "X-Forwarded-For": "203.0.113.8"},
+    )
+    assert response.status_code == 200
+    with session_factory() as db:
+        row = db.query(AuditLog).filter_by(action="login").one()
+        assert row.ip is None
 
 
 def test_role_is_read_from_database_not_token(make_user, auth_header, client, session_factory):

@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: soc_test
+          POSTGRES_USER: soc_test
+          POSTGRES_PASSWORD: soc_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U soc_test -d soc_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_TEST_URL: postgresql+psycopg://soc_test:soc_test_password@localhost:5432/soc_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run backend and PostgreSQL integration tests
+        working-directory: backend
+        run: python -m pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check frontend JavaScript syntax
+        run: node --check frontend/assets/app.js && node --check frontend/assets/mock-data.js

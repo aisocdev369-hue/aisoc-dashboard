@@ -1,4 +1,3 @@
-from functools import lru_cache
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -10,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.request import client_ip
 from app.core.security import create_access_token, hash_password, timing_dummy_hash, verify_password
 from app.db.models import User
 from app.db.session import get_db
@@ -31,7 +31,7 @@ INVALID = "Invalid email or password"
 
 
 def _client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
+    return client_ip(request)
 
 
 @router.post("/login", response_model=TokenOut)
