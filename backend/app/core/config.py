@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: str = ""
     cors_allowed_origins: str = "http://localhost:8080"
+    # "mock" (seeded demo alerts) or "live" (the two endpoint agents feed /api/v1/ingest).
+    # Only gates `cli.py seed-simulated` today — it doesn't disable the ingest endpoint itself.
     monitoring_mode: str = "mock"
 
     # Authentication

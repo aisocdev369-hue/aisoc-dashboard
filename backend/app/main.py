@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.db.session import get_engine
-from app.routers import admin, ai, alerts, auth
+from app.routers import admin, ai, alerts, auth, sources
 
 settings = get_settings()
 logging.basicConfig(level=settings.log_level)
@@ -31,6 +31,7 @@ app.include_router(auth.router)
 app.include_router(alerts.router)
 app.include_router(ai.router)
 app.include_router(admin.router)
+app.include_router(sources.router)
 
 
 @app.get("/health", tags=["health"])

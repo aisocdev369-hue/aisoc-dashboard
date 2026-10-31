@@ -47,6 +47,26 @@ To reset a password (e.g. if you forgot the one you set), run:
 docker compose exec api python -m app.cli set-password --email you@example.com
 ```
 
+## Endpoint agents (Windows 11 + Linux)
+
+The dashboard monitors two known machines directly — no Wazuh/Suricata deployment. An
+admin registers each endpoint and gets back a one-time token:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/admin/endpoints \
+  -H "Authorization: Bearer <admin access token>" \
+  -H "Content-Type: application/json" \
+  -d '{"hostname": "WIN11-DESKTOP", "os": "windows"}'
+```
+
+Run the matching agent on that machine with the printed token — see `agents/README.md`
+for full setup. Each agent polls logins, new processes, and a few watched paths, and posts
+them to `POST /api/v1/ingest`, where they become ordinary alerts (`external_id` prefixed
+`AGENT-`). Check endpoint status with `GET /api/v1/sources/health` (analyst or admin).
+
+Set `MONITORING_MODE=live` once both agents are running — this stops `seed-simulated` from
+mixing fake alerts into real data (override with `--force` if that's intentional).
+
 ## Gemini AI analysis
 
 Set `GEMINI_API_KEY` in Codespaces Secrets or `.env`. Without it, the analysis button returns "not configured" and nothing is sent to Google. Analysis sends only the alert fields listed in `backend/app/routers/ai.py`. Outputs are validated and stored, and never executed.
@@ -61,7 +81,7 @@ cd backend && pip install -r requirements.txt && pytest -q
 
 This repository is a development preview, not a production SOC deployment. Before production:
 
-- Connect and validate the chosen monitoring sources. The current dashboard uses simulated alerts; Wazuh and Suricata integrations are not implemented. Do not seed simulated alerts in a production database.
+- Register both endpoints (`POST /api/v1/admin/endpoints`) and get their agents running before switching `MONITORING_MODE` to `live`. Do not seed simulated alerts into a database that's also receiving real agent events.
 - Terminate HTTPS at the deployment boundary and configure the production domain, Google OAuth authorized origins, and narrow CORS origins.
 - Replace all placeholder credentials with strong production secrets stored outside the repository. Use a production database and verify migrations and health checks in the deployment environment.
 - Decide whether Gemini analysis is enabled. Review the alert fields sent to Google and applicable data-handling requirements before configuring `GEMINI_API_KEY`.

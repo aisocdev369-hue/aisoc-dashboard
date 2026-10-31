@@ -8,6 +8,8 @@ from app.db.session import Base
 ROLES = ("admin", "analyst")
 SEVERITIES = ("critical", "high", "medium", "low")
 ALERT_STATUSES = ("New", "Investigating", "Closed")
+ENDPOINT_OS = ("windows", "linux")
+EVENT_TYPES = ("login", "process_start", "file_change", "network_connection")
 
 
 def _now() -> datetime:
@@ -62,6 +64,43 @@ class AIAnalysis(Base):
     confidence_explanation: Mapped[str | None] = mapped_column(Text)
     recommendations: Mapped[str | None] = mapped_column(Text)  # JSON array as text
     error_code: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_now, index=True)
+
+
+class Endpoint(Base):
+    """A registered monitoring source: one of the project's known machines (Windows 11 or Linux)."""
+
+    __tablename__ = "endpoints"
+    __table_args__ = (CheckConstraint("os IN ('windows', 'linux')", name="ck_endpoints_os"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    hostname: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    os: Mapped[str] = mapped_column(String(16), nullable=False)
+    # SHA-256 of the per-endpoint secret half of its token (see app.core.security). Never the raw token.
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_now)
+
+
+class EndpointEvent(Base):
+    """A single raw event reported by an endpoint agent, optionally promoted to an Alert."""
+
+    __tablename__ = "endpoint_events"
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('login', 'process_start', 'file_change', 'network_connection')",
+            name="ck_endpoint_events_type",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    endpoint_id: Mapped[int] = mapped_column(ForeignKey("endpoints.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_event_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    detail: Mapped[str] = mapped_column(Text, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    alert_id: Mapped[int | None] = mapped_column(ForeignKey("alerts.id", ondelete="SET NULL"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_now, index=True)
 
 

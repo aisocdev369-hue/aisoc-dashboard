@@ -1,4 +1,7 @@
 import datetime as dt
+import hashlib
+import hmac
+import secrets
 from functools import lru_cache
 
 import bcrypt
@@ -43,3 +46,24 @@ def create_access_token(user_id: int, role: str) -> tuple[str, int]:
 def decode_access_token(token: str) -> dict:
     settings = get_settings()
     return jwt.decode(token, settings.jwt_secret(), algorithms=[settings.jwt_algorithm])
+
+
+# Endpoint agent tokens: "<endpoint id>:<random secret>". The id gives O(1) lookup; only the
+# secret's hash is ever stored, so a stolen database row cannot be replayed as a token.
+def generate_endpoint_secret() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def hash_endpoint_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+def verify_endpoint_secret(secret: str, hashed: str) -> bool:
+    return hmac.compare_digest(hash_endpoint_secret(secret), hashed)
+
+
+def parse_endpoint_token(token: str) -> tuple[int, str] | None:
+    endpoint_id, sep, secret = token.partition(":")
+    if not sep or not endpoint_id.isdigit() or not secret:
+        return None
+    return int(endpoint_id), secret

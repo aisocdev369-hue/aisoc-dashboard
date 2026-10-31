@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.security import hash_password
-from app.db.models import AuditLog, User
+from app.core.security import generate_endpoint_secret, hash_endpoint_secret, hash_password
+from app.db.models import AuditLog, Endpoint, User
 from app.db.session import get_db
 from app.deps import require_roles
-from app.schemas import AuditOut, UserCreate, UserOut, UserRoleUpdate
+from app.schemas import AuditOut, EndpointCreate, EndpointOut, EndpointRegistered, UserCreate, UserOut, UserRoleUpdate
 from app.services import audit
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -79,6 +79,28 @@ def update_user_role(
         ip=_client_ip(request),
     )
     return UserOut.model_validate(user)
+
+
+@router.post("/endpoints", response_model=EndpointRegistered, status_code=201)
+def register_endpoint(
+    body: EndpointCreate,
+    request: Request,
+    admin: User = Depends(ADMIN_ONLY),
+    db: Session = Depends(get_db),
+) -> EndpointRegistered:
+    """Registers one of the project's two monitored machines and issues its agent token.
+    The token is returned once, here, and never stored or shown again — only its hash is kept."""
+    if db.scalar(select(Endpoint.id).where(Endpoint.hostname == body.hostname)) is not None:
+        raise HTTPException(status_code=409, detail="An endpoint with this hostname is already registered")
+
+    secret = generate_endpoint_secret()
+    endpoint = Endpoint(hostname=body.hostname, os=body.os, token_hash=hash_endpoint_secret(secret), is_active=True)
+    db.add(endpoint)
+    db.commit()
+    db.refresh(endpoint)
+
+    audit.record(db, "endpoint_registered", actor_id=admin.id, target=body.hostname, detail=f"os={body.os}", ip=_client_ip(request))
+    return EndpointRegistered(endpoint=EndpointOut.model_validate(endpoint), token=f"{endpoint.id}:{secret}")
 
 
 @router.get("/audit-logs", response_model=list[AuditOut])

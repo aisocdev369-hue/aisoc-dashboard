@@ -5,8 +5,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_access_token
-from app.db.models import User
+from app.core.security import decode_access_token, parse_endpoint_token, verify_endpoint_secret
+from app.db.models import Endpoint, User
 from app.db.session import get_db
 
 _bearer = HTTPBearer(auto_error=False)
@@ -37,6 +37,24 @@ def get_current_user(
     if user is None or not user.is_active:
         raise _unauthorized()
     return user
+
+
+def get_current_endpoint(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> Endpoint:
+    """Resolve an endpoint-agent bearer token (see app.core.security) to its active Endpoint row."""
+    if creds is None or creds.scheme.lower() != "bearer":
+        raise _unauthorized()
+    parsed = parse_endpoint_token(creds.credentials)
+    if parsed is None:
+        raise _unauthorized()
+    endpoint_id, secret = parsed
+
+    endpoint = db.get(Endpoint, endpoint_id)
+    if endpoint is None or not endpoint.is_active or not verify_endpoint_secret(secret, endpoint.token_hash):
+        raise _unauthorized()
+    return endpoint
 
 
 def require_roles(*roles: str) -> Callable[..., User]:

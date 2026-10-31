@@ -13,6 +13,7 @@ import sys
 
 from sqlalchemy import func, select
 
+from app.core.config import get_settings
 from app.core.security import hash_password
 from app.db.models import ROLES, User
 from app.db.session import get_session_factory
@@ -105,7 +106,16 @@ def _set_role(email: str, role: str) -> int:
     return 0
 
 
-def _seed(count: int) -> int:
+def _seed(count: int, force: bool) -> int:
+    mode = get_settings().monitoring_mode
+    if mode == "live" and not force:
+        print(
+            f"MONITORING_MODE=live: refusing to seed simulated alerts into a live dataset. "
+            f"Pass --force if this is intentional.",
+            file=sys.stderr,
+        )
+        return 2
+
     factory = get_session_factory()
     if factory is None:
         print("DATABASE_URL is not configured.", file=sys.stderr)
@@ -133,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
 
     seed = sub.add_parser("seed-simulated", help="Insert clearly labelled simulated alerts")
     seed.add_argument("--count", type=int, default=48, choices=range(1, 501), metavar="1-500")
+    seed.add_argument("--force", action="store_true", help="Seed even when MONITORING_MODE=live")
 
     args = parser.parse_args(argv)
     if args.command == "create-user":
@@ -141,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         return _set_password(args.email)
     if args.command == "set-role":
         return _set_role(args.email, args.role)
-    return _seed(args.count)
+    return _seed(args.count, args.force)
 
 
 if __name__ == "__main__":

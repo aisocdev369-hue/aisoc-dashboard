@@ -1,0 +1,6 @@
+# Common to both agents.
+requests==2.31.0
+psutil==5.9.8
+
+# Windows only (windows_agent.py). Leave uninstalled on Linux.
+# pywin32==306
